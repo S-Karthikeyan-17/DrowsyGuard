@@ -1,0 +1,1121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DrowsyGuard — Driver Safety Monitor</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&family=Orbitron:wght@400;600;900&display=swap" rel="stylesheet"/>
+
+<style>
+:root {
+  --bg:        #060a0f;
+  --surface:   #0c1219;
+  --panel:     #101820;
+  --border:    #1a2e3d;
+  --accent:    #00e5ff;
+  --accent2:   #00ff88;
+  --warn:      #ffb300;
+  --danger:    #ff1744;
+  --text:      #c8d8e4;
+  --muted:     #4a6070;
+  --font-hud:  'Orbitron', sans-serif;
+  --font-body: 'Rajdhani', sans-serif;
+  --font-mono: 'Share Tech Mono', monospace;
+  --glow:      0 0 18px rgba(0,229,255,0.35);
+  --glow-w:    0 0 18px rgba(255,179,0,0.45);
+  --glow-d:    0 0 18px rgba(255,23,68,0.55);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(0,229,255,0.07) 0%, transparent 70%),
+    linear-gradient(180deg, #060a0f 0%, #080d14 100%);
+}
+
+body::before {
+  content: '';
+  position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background-image: repeating-linear-gradient(
+    0deg, transparent, transparent 2px,
+    rgba(0,229,255,0.015) 2px, rgba(0,229,255,0.015) 4px
+  );
+}
+
+/* ── Header ── */
+header {
+  position: relative; z-index: 10;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 2rem;
+  height: 64px;
+  background: rgba(10,18,28,0.92);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(10px);
+}
+.logo { display: flex; align-items: center; gap: .75rem; }
+.logo-icon {
+  width: 36px; height: 36px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  border-radius: 8px;
+  display: grid; place-items: center;
+  font-size: 1.2rem;
+  animation: pulse-logo 3s ease-in-out infinite;
+}
+@keyframes pulse-logo {
+  0%,100% { box-shadow: 0 0 10px rgba(0,229,255,.3); }
+  50%      { box-shadow: 0 0 24px rgba(0,229,255,.65), 0 0 48px rgba(0,229,255,.2); }
+}
+.logo-text { font-family: var(--font-hud); font-size: 1.15rem; letter-spacing: .12em; color: #fff; }
+.logo-text span { color: var(--accent); }
+
+.header-status {
+  display: flex; align-items: center; gap: 1.5rem;
+  font-family: var(--font-mono); font-size: .75rem; color: var(--muted);
+}
+.status-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--muted);
+  transition: background .3s, box-shadow .3s;
+}
+.status-dot.live {
+  background: var(--accent2);
+  box-shadow: 0 0 8px var(--accent2);
+  animation: blink 1.5s step-start infinite;
+}
+@keyframes blink { 50% { opacity: .2; } }
+
+/* ── Layout ── */
+.main {
+  position: relative; z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  grid-template-rows: auto 1fr;
+  gap: 1.25rem;
+  padding: 1.25rem 1.5rem 1.5rem;
+  max-width: 1300px;
+  margin: 0 auto;
+}
+
+.section-label {
+  font-family: var(--font-mono);
+  font-size: .6rem;
+  letter-spacing: .2em;
+  color: var(--accent);
+  text-transform: uppercase;
+  margin-bottom: .5rem;
+  opacity: .75;
+}
+
+/* ── Alert Banner ── */
+.alert-banner {
+  grid-column: 1 / -1;
+  border-radius: 10px;
+  padding: .65rem 1.25rem;
+  display: flex; align-items: center; gap: 1rem;
+  font-family: var(--font-hud);
+  font-size: .8rem;
+  letter-spacing: .1em;
+  transition: background .3s, border-color .3s, color .3s, box-shadow .3s;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+}
+.alert-banner.warning {
+  border-color: var(--warn);
+  background: rgba(255,179,0,0.08);
+  color: var(--warn);
+  box-shadow: var(--glow-w);
+}
+.alert-banner.danger {
+  border-color: var(--danger);
+  background: rgba(255,23,68,0.1);
+  color: var(--danger);
+  box-shadow: var(--glow-d);
+  animation: shake .18s ease-in-out 3;
+}
+@keyframes shake {
+  0%,100% { transform: translateX(0); }
+  25%      { transform: translateX(-6px); }
+  75%      { transform: translateX(6px); }
+}
+.alert-icon { font-size: 1.3rem; }
+.alert-text { flex: 1; }
+.alert-level-badge {
+  padding: .2rem .75rem;
+  border-radius: 4px;
+  font-size: .7rem;
+  letter-spacing: .15em;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid currentColor;
+}
+
+/* ── Camera Panel ── */
+.camera-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+  transition: border-color .3s, box-shadow .3s;
+}
+.camera-panel.alert-warning { border-color: var(--warn) !important; box-shadow: var(--glow-w) !important; }
+.camera-panel.alert-danger  { border-color: var(--danger) !important; box-shadow: var(--glow-d) !important; }
+.camera-panel.alert-normal  { border-color: var(--border); box-shadow: none; }
+
+.camera-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: .65rem 1rem;
+  background: rgba(0,0,0,.3);
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono); font-size: .7rem; color: var(--muted);
+}
+.rec-badge {
+  display: flex; align-items: center; gap: .4rem;
+  background: rgba(255,23,68,.15);
+  border: 1px solid rgba(255,23,68,.4);
+  border-radius: 4px;
+  padding: .15rem .55rem;
+  color: var(--danger); font-size: .65rem; letter-spacing: .1em;
+}
+.rec-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--danger);
+  animation: blink 1s step-start infinite;
+}
+
+.video-wrapper {
+  position: relative;
+  flex: 1;
+  background: #000;
+  display: flex; align-items: center; justify-content: center;
+  min-height: 400px;
+}
+
+/*
+  Video must NOT be display:none or have zero dimensions.
+  Positioned off-screen with real pixel dimensions so the browser
+  can decode frames into a drawable canvas surface.
+*/
+#videoEl {
+  position: fixed;
+  top: -9999px;
+  left: -9999px;
+  width: 640px;
+  height: 480px;
+  pointer-events: none;
+}
+
+/* Canvas also off-screen; dimensions set dynamically in JS */
+#canvasEl {
+  position: fixed;
+  top: -9999px;
+  left: -9999px;
+  pointer-events: none;
+}
+
+#outputImg {
+  width: 100%;
+  height: 100%;
+  display: none;
+  object-fit: contain;
+  background: #000;
+}
+
+.placeholder {
+  display: flex; flex-direction: column; align-items: center; gap: 1rem;
+  color: var(--muted); font-family: var(--font-mono); font-size: .8rem;
+  padding: 3rem; text-align: center;
+}
+.placeholder-icon { font-size: 3rem; opacity: .3; }
+
+/* HUD corner brackets */
+.corner { position: absolute; width: 22px; height: 22px; border-color: var(--accent); border-style: solid; opacity: .6; }
+.corner.tl { top: 8px;    left: 8px;   border-width: 2px 0 0 2px; }
+.corner.tr { top: 8px;    right: 8px;  border-width: 2px 2px 0 0; }
+.corner.bl { bottom: 8px; left: 8px;   border-width: 0 0 2px 2px; }
+.corner.br { bottom: 8px; right: 8px;  border-width: 0 2px 2px 0; }
+
+.camera-footer {
+  display: flex; align-items: center; gap: .75rem;
+  padding: .75rem 1rem;
+  border-top: 1px solid var(--border);
+  background: rgba(0,0,0,.25);
+}
+
+/* ── Buttons ── */
+.btn {
+  font-family: var(--font-hud);
+  font-size: .72rem;
+  letter-spacing: .12em;
+  padding: .5rem 1.25rem;
+  border-radius: 6px;
+  border: 1px solid;
+  cursor: pointer;
+  transition: all .2s ease;
+  text-transform: uppercase;
+}
+.btn:disabled { opacity: .4; cursor: not-allowed; pointer-events: none; }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 700; }
+.btn-primary:hover { background: #33ecff; box-shadow: var(--glow); }
+.btn-outline { background: transparent; border-color: var(--border); color: var(--muted); }
+.btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+.btn-danger { background: transparent; border-color: rgba(255,23,68,.4); color: var(--danger); }
+.btn-danger:hover { background: rgba(255,23,68,.12); }
+
+.fps-label {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: .65rem;
+  color: var(--muted);
+}
+
+/* ── Right Panel ── */
+.right-panel { display: flex; flex-direction: column; gap: 1rem; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem 1.1rem;
+}
+
+/* ── Gauges ── */
+.gauges { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+.gauge {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: .75rem; text-align: center;
+}
+.gauge-value {
+  font-family: var(--font-hud);
+  font-size: 1.8rem; font-weight: 900;
+  color: var(--accent);
+  line-height: 1;
+  transition: color .3s;
+}
+.gauge-value.warn   { color: var(--warn); }
+.gauge-value.danger { color: var(--danger); }
+.gauge-label {
+  font-family: var(--font-mono);
+  font-size: .58rem; color: var(--muted);
+  letter-spacing: .12em; margin-top: .3rem;
+}
+
+/* ── Status Items ── */
+.status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+.status-item {
+  display: flex; align-items: center; gap: .6rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: .6rem .75rem;
+  transition: border-color .3s, background .3s;
+}
+.status-item.active-ok   { border-color: var(--accent2); background: rgba(0,255,136,.06); }
+.status-item.active-bad  { border-color: var(--danger);  background: rgba(255,23,68,.06); }
+.status-item.active-warn { border-color: var(--warn);    background: rgba(255,179,0,.06); }
+.status-indicator {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--border); flex-shrink: 0;
+  transition: background .3s, box-shadow .3s;
+}
+.active-ok   .status-indicator { background: var(--accent2); box-shadow: 0 0 6px var(--accent2); }
+.active-bad  .status-indicator { background: var(--danger);  box-shadow: 0 0 6px var(--danger); }
+.active-warn .status-indicator { background: var(--warn);    box-shadow: 0 0 6px var(--warn); }
+.status-text { font-family: var(--font-body); font-size: .8rem; font-weight: 500; color: var(--text); }
+.status-sub  { font-family: var(--font-mono); font-size: .58rem; color: var(--muted); }
+
+/* ── Meters ── */
+.meter-row { margin-top: .5rem; }
+.meter-label {
+  display: flex; justify-content: space-between;
+  font-family: var(--font-mono); font-size: .62rem; color: var(--muted);
+  margin-bottom: .3rem;
+}
+.meter-bar {
+  height: 6px; border-radius: 3px;
+  background: var(--panel); border: 1px solid var(--border); overflow: hidden;
+}
+.meter-fill {
+  height: 100%; border-radius: 3px;
+  background: linear-gradient(90deg, var(--accent2), var(--accent));
+  transition: width .3s ease, background .3s;
+  width: 0%;
+}
+.meter-fill.warn   { background: linear-gradient(90deg, var(--warn), #ff6d00); }
+.meter-fill.danger { background: linear-gradient(90deg, var(--danger), #ff5252); }
+
+/* ── EAR / MAR values display ── */
+.ratio-row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: .6rem;
+  margin-top: .6rem;
+}
+.ratio-box {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: .5rem .75rem;
+  text-align: center;
+  transition: border-color .3s;
+}
+.ratio-box.bad { border-color: var(--danger); }
+.ratio-box.warn { border-color: var(--warn); }
+.ratio-value {
+  font-family: var(--font-hud);
+  font-size: 1.2rem; font-weight: 700;
+  color: var(--accent);
+  transition: color .3s;
+}
+.ratio-box.bad  .ratio-value { color: var(--danger); }
+.ratio-box.warn .ratio-value { color: var(--warn); }
+.ratio-label {
+  font-family: var(--font-mono); font-size: .55rem;
+  color: var(--muted); letter-spacing: .1em; margin-top: .2rem;
+}
+.ratio-thresh {
+  font-family: var(--font-mono); font-size: .5rem;
+  color: var(--muted); opacity: .6;
+}
+
+/* ── Log ── */
+.log-box {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  height: 140px; overflow-y: auto;
+  padding: .5rem .75rem;
+  font-family: var(--font-mono); font-size: .62rem; color: var(--muted);
+  scroll-behavior: smooth;
+}
+.log-box::-webkit-scrollbar { width: 4px; }
+.log-box::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.log-entry { padding: .2rem 0; border-bottom: 1px solid rgba(255,255,255,.03); }
+.log-entry.log-danger { color: var(--danger); }
+.log-entry.log-warn   { color: var(--warn); }
+.log-entry.log-ok     { color: var(--accent2); }
+.log-time { color: var(--accent); margin-right: .5rem; }
+
+/* ── Config ── */
+.config-row { display: flex; align-items: center; gap: .5rem; margin-bottom: .6rem; }
+.config-row input, .config-row select {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: .4rem .75rem;
+  color: var(--text);
+  font-family: var(--font-mono); font-size: .7rem;
+  outline: none;
+  transition: border-color .2s;
+}
+.config-row input { flex: 1; }
+.config-row input:focus { border-color: var(--accent); }
+.config-row select { cursor: pointer; }
+.config-label {
+  font-family: var(--font-mono); font-size: .6rem;
+  color: var(--muted); white-space: nowrap;
+}
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .main { grid-template-columns: 1fr; }
+  .right-panel { order: -1; }
+}
+
+/* ── Entrance animation ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.main > * { animation: fadeUp .5s ease both; }
+.main > *:nth-child(1) { animation-delay: .05s; }
+.main > *:nth-child(2) { animation-delay: .15s; }
+.main > *:nth-child(3) { animation-delay: .25s; }
+</style>
+</head>
+<body>
+
+<!--
+  Video MUST NOT be display:none or have zero dimensions.
+  Browsers won't decode frames into a drawable surface unless the
+  element has real pixel dimensions and is in the DOM.
+  We park it off-screen at a fixed 640×480.
+-->
+<video id="videoEl" autoplay playsinline muted></video>
+<canvas id="canvasEl"></canvas>
+
+<!-- ══════════ HEADER ══════════ -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">🚗</div>
+    <div class="logo-text">Drowsy<span>Guard</span></div>
+  </div>
+  <div class="header-status">
+    <div class="status-dot" id="connDot"></div>
+    <span id="connLabel">OFFLINE</span>
+    <span>|</span>
+    <span id="headerTime">--:--:--</span>
+  </div>
+</header>
+
+<!-- ══════════ MAIN ══════════ -->
+<div class="main">
+
+  <!-- Alert Banner -->
+  <div class="alert-banner" id="alertBanner">
+    <div class="alert-icon" id="alertIcon">🟢</div>
+    <div class="alert-text" id="alertText">System ready. Start camera to begin monitoring.</div>
+    <div class="alert-level-badge" id="alertBadge">IDLE</div>
+  </div>
+
+  <!-- Camera Panel -->
+  <div class="camera-panel alert-normal" id="cameraPanel">
+    <div class="camera-header">
+      <span>CAM-01 / DRIVER FEED</span>
+      <div class="rec-badge" id="recBadge" style="display:none;">
+        <div class="rec-dot"></div> LIVE
+      </div>
+    </div>
+
+    <div class="video-wrapper">
+      <div class="placeholder" id="placeholderEl">
+        <div class="placeholder-icon">📷</div>
+        <div>CAMERA INACTIVE</div>
+        <div style="font-size:.65rem;margin-top:.3rem;">Click START to begin monitoring</div>
+      </div>
+      <img id="outputImg" alt="Processed feed"/>
+      <div class="corner tl"></div>
+      <div class="corner tr"></div>
+      <div class="corner bl"></div>
+      <div class="corner br"></div>
+    </div>
+
+    <div class="camera-footer">
+      <button class="btn btn-primary" id="startBtn" onclick="startCamera()">▶ START</button>
+      <button class="btn btn-outline" id="stopBtn"  onclick="stopCamera()"  disabled>■ STOP</button>
+      <button class="btn btn-danger"                onclick="resetSession()">↺ RESET</button>
+      <span class="fps-label" id="fpsLabel">-- FPS</span>
+    </div>
+  </div>
+
+  <!-- Right Panel -->
+  <div class="right-panel">
+
+    <!-- Server Config -->
+    <div class="card">
+      <div class="section-label">⚙ server config</div>
+      <div class="config-row">
+        <input type="text" id="serverUrl" value="http://localhost:5000" placeholder="http://localhost:5000"/>
+        <button class="btn btn-outline" onclick="pingServer()" style="padding:.4rem .75rem;white-space:nowrap;">Ping</button>
+      </div>
+      <div class="config-row" style="margin-bottom:0;">
+        <span class="config-label">TARGET FPS</span>
+        <select id="targetFps">
+          <option value="5">5 fps</option>
+          <option value="10" selected>10 fps</option>
+          <option value="15">15 fps</option>
+          <option value="20">20 fps</option>
+        </select>
+      </div>
+      <div id="pingStatus" style="font-family:var(--font-mono);font-size:.6rem;color:var(--muted);margin-top:.5rem;">— Not checked</div>
+    </div>
+
+    <!-- Session Metrics -->
+    <div class="card">
+      <div class="section-label">📊 session metrics</div>
+      <div class="gauges">
+        <div class="gauge">
+          <div class="gauge-value" id="gFrames">0</div>
+          <div class="gauge-label">FRAMES</div>
+        </div>
+        <div class="gauge">
+          <div class="gauge-value" id="gFPS">0</div>
+          <div class="gauge-label">FPS</div>
+        </div>
+        <div class="gauge">
+          <div class="gauge-value danger" id="gDrowsy">0</div>
+          <div class="gauge-label">DROWSY ALERTS</div>
+        </div>
+        <div class="gauge">
+          <div class="gauge-value warn" id="gYawn">0</div>
+          <div class="gauge-label">YAWNS</div>
+        </div>
+      </div>
+
+      <!-- EAR / MAR live values -->
+      <div class="ratio-row">
+        <div class="ratio-box" id="earBox">
+          <div class="ratio-value" id="earVal">—</div>
+          <div class="ratio-label">EAR</div>
+          <div class="ratio-thresh">thresh &lt; 0.22</div>
+        </div>
+        <div class="ratio-box" id="marBox">
+          <div class="ratio-value" id="marVal">—</div>
+          <div class="ratio-label">MAR</div>
+          <div class="ratio-thresh">thresh &gt; 0.65</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Detection Status -->
+    <div class="card">
+      <div class="section-label">🔍 detection status</div>
+      <div class="status-grid">
+        <div class="status-item" id="siEyes">
+          <div class="status-indicator"></div>
+          <div>
+            <div class="status-text">Eyes</div>
+            <div class="status-sub" id="siEyesSub">--</div>
+          </div>
+        </div>
+        <div class="status-item" id="siFace">
+          <div class="status-indicator"></div>
+          <div>
+            <div class="status-text">Face</div>
+            <div class="status-sub" id="siFaceSub">--</div>
+          </div>
+        </div>
+        <div class="status-item" id="siYawn">
+          <div class="status-indicator"></div>
+          <div>
+            <div class="status-text">Yawn</div>
+            <div class="status-sub" id="siYawnSub">--</div>
+          </div>
+        </div>
+        <div class="status-item" id="siDrowsy">
+          <div class="status-indicator"></div>
+          <div>
+            <div class="status-text">Drowsy</div>
+            <div class="status-sub" id="siDrowsySub">--</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Drowsiness Meters -->
+    <div class="card">
+      <div class="section-label">📈 drowsiness pressure</div>
+      <div class="meter-row">
+        <div class="meter-label">
+          <span>EYE CLOSURE</span>
+          <span id="mEyeVal">0/15</span>
+        </div>
+        <div class="meter-bar"><div class="meter-fill" id="mEye"></div></div>
+      </div>
+      <div class="meter-row" style="margin-top:.75rem;">
+        <div class="meter-label">
+          <span>YAWN PRESSURE</span>
+          <span id="mYawnVal">0/10</span>
+        </div>
+        <div class="meter-bar"><div class="meter-fill" id="mYawn"></div></div>
+      </div>
+    </div>
+
+    <!-- Event Log -->
+    <div class="card">
+      <div class="section-label">📋 event log</div>
+      <div class="log-box" id="logBox">
+        <div class="log-entry log-ok"><span class="log-time">SYSTEM</span>DrowsyGuard initialised.</div>
+      </div>
+    </div>
+
+  </div><!-- /right-panel -->
+</div><!-- /main -->
+
+<!-- ══════════ JAVASCRIPT ══════════ -->
+<script>
+// ── DOM refs ───────────────────────────────────────────
+const video  = document.getElementById('videoEl');
+const canvas = document.getElementById('canvasEl');
+const ctx    = canvas.getContext('2d');
+const output = document.getElementById('outputImg');
+
+// ── Thresholds (must match server) ────────────────────
+const EYE_MAX  = 15;  // EYE_CLOSED_FRAMES
+const YAWN_MAX = 10;  // YAWN_FRAME_THRESH
+const EAR_THRESH = 0.22;
+const MAR_THRESH = 0.65;
+
+// ── Session state ──────────────────────────────────────
+let stream         = null;
+let running        = false;
+let loopTimer      = null;
+let inFlight       = false;
+let framesSent     = 0;
+let prevAlertLevel = 'IDLE';
+let audioCtx       = null;
+
+// FPS tracking using real frame timestamps
+let lastFrameTime  = 0;
+let fpsHistory     = [];
+
+// ── Clock ──────────────────────────────────────────────
+setInterval(() => {
+  document.getElementById('headerTime').textContent =
+    new Date().toLocaleTimeString('en-IN', { hour12: false });
+}, 1000);
+
+// Re-schedule loop if FPS setting changes mid-session
+document.getElementById('targetFps').addEventListener('change', () => {
+  if (running) scheduleLoop();
+});
+
+// ── Web Audio alarm ─────────────────────────────────────
+function playAlarm(type) {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc  = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.type = 'square';
+    if (type === 'danger') {
+      osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+      osc.frequency.setValueAtTime(440, audioCtx.currentTime + 0.15);
+      gain.gain.setValueAtTime(0.35, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+      osc.start(audioCtx.currentTime);
+      osc.stop(audioCtx.currentTime + 0.5);
+    } else {
+      osc.frequency.setValueAtTime(660, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+      osc.start(audioCtx.currentTime);
+      osc.stop(audioCtx.currentTime + 0.3);
+    }
+  } catch (e) { /* audio not critical */ }
+}
+
+// ══════════════════════════════════════════════════════
+//  startCamera
+// ══════════════════════════════════════════════════════
+async function startCamera() {
+  try {
+    // 1. Request webcam
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
+      audio: false
+    });
+
+    // 2. Attach stream
+    video.srcObject = stream;
+
+    // 3. Wait for metadata — safe race-condition guard
+    await new Promise((resolve, reject) => {
+      if (video.readyState >= 1) { resolve(); return; }
+      let settled = false;
+      function done(err) {
+        if (settled) return;
+        settled = true;
+        video.removeEventListener('loadedmetadata', onMeta);
+        video.removeEventListener('error', onErr);
+        clearTimeout(timer);
+        if (err) reject(err); else resolve();
+      }
+      const onMeta = () => done(null);
+      const onErr  = (e) => done(new Error('Video stream error: ' + (e.message || 'unknown')));
+      const timer  = setTimeout(() => done(null), 4000);
+      video.addEventListener('loadedmetadata', onMeta);
+      video.addEventListener('error', onErr);
+    });
+
+    // 4. Play
+    await video.play();
+
+    // 5. Size canvas to actual video dimensions (fall back to 640×480)
+    canvas.width  = video.videoWidth  || 640;
+    canvas.height = video.videoHeight || 480;
+
+    addLog('Video: ' + canvas.width + '×' + canvas.height, 'ok');
+
+    // 6. Wait one rAF to confirm video is rendering
+    await new Promise(resolve => requestAnimationFrame(resolve));
+
+    // 7. Update UI
+    document.getElementById('placeholderEl').style.display = 'none';
+    output.style.display = 'block';
+    document.getElementById('recBadge').style.display      = 'flex';
+    document.getElementById('startBtn').disabled           = true;
+    document.getElementById('stopBtn').disabled            = false;
+    document.getElementById('connDot').classList.add('live');
+    document.getElementById('connLabel').textContent       = 'LIVE';
+
+    // 8. Reset session state
+    running        = true;
+    inFlight       = false;
+    framesSent     = 0;
+    fpsHistory     = [];
+    lastFrameTime  = 0;
+    prevAlertLevel = 'IDLE';
+
+    // 9. Prime AudioContext (must be from user gesture)
+    if (!audioCtx) {
+      try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){}
+    }
+
+    // 10. Start loop
+    scheduleLoop();
+    addLog('Camera started — ' + canvas.width + '×' + canvas.height, 'ok');
+
+  } catch (e) {
+    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    addLog('Camera error: ' + e.message, 'danger');
+    alert('Camera access failed.\n\n' + e.message +
+          '\n\nCheck:\n• Camera permission allowed\n• No other app using camera\n• HTTPS or localhost');
+  }
+}
+
+// ══════════════════════════════════════════════════════
+//  stopCamera
+// ══════════════════════════════════════════════════════
+function stopCamera() {
+  running = false;
+  if (loopTimer) { clearInterval(loopTimer); loopTimer = null; }
+  if (stream)    { stream.getTracks().forEach(t => t.stop()); stream = null; }
+
+  output.style.display = 'none';
+  document.getElementById('placeholderEl').style.display = 'flex';
+  document.getElementById('recBadge').style.display      = 'none';
+  document.getElementById('startBtn').disabled           = false;
+  document.getElementById('stopBtn').disabled            = true;
+  document.getElementById('connDot').classList.remove('live');
+  document.getElementById('connLabel').textContent       = 'OFFLINE';
+
+  setAlertUI('IDLE');
+  addLog('Camera stopped.', 'ok');
+}
+
+// ══════════════════════════════════════════════════════
+//  scheduleLoop
+// ══════════════════════════════════════════════════════
+function scheduleLoop() {
+  if (loopTimer) clearInterval(loopTimer);
+  const fps      = parseInt(document.getElementById('targetFps').value, 10) || 10;
+  const interval = Math.round(1000 / fps);
+  loopTimer = setInterval(() => {
+    if (running && !inFlight) sendFrame();
+  }, interval);
+}
+
+// ══════════════════════════════════════════════════════
+//  sendFrame  — fixed version
+// ══════════════════════════════════════════════════════
+async function sendFrame() {
+  if (!running || inFlight) return;
+
+  // Need at least HAVE_CURRENT_DATA (readyState >= 2) before drawImage
+  if (video.readyState < 2) return;
+
+  // Skip if video dimensions not yet available
+  if (!video.videoWidth || !video.videoHeight) return;
+
+  inFlight = true;
+  const now = performance.now();
+
+  // Update real FPS from inter-frame interval
+  if (lastFrameTime > 0) {
+    const intervalMs = now - lastFrameTime;
+    fpsHistory.push(1000 / Math.max(intervalMs, 10));
+    if (fpsHistory.length > 12) fpsHistory.shift();
+    const avgFps = fpsHistory.reduce((a,b) => a+b, 0) / fpsHistory.length;
+    document.getElementById('fpsLabel').textContent = avgFps.toFixed(1) + ' FPS';
+    document.getElementById('gFPS').textContent     = avgFps.toFixed(0);
+  }
+  lastFrameTime = now;
+
+  // Resize canvas if camera dimensions changed
+  if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+    canvas.width  = video.videoWidth;
+    canvas.height = video.videoHeight;
+  }
+
+  // Draw frame into canvas
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  // Capture as JPEG base64
+  const b64 = canvas.toDataURL('image/jpeg', 0.75);
+
+  // A completely blank/failed canvas returns 'data:,' or a tiny stub
+  // JPEG header is always > 100 chars; anything shorter is invalid
+  if (!b64 || b64.length < 200) {
+    inFlight = false;
+    return;
+  }
+
+  const serverUrl = document.getElementById('serverUrl').value.replace(/\/$/, '');
+
+  try {
+    const resp = await fetch(serverUrl + '/process', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ image: b64 })
+    });
+
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+
+    if (!running) { inFlight = false; return; }
+
+    // ── Annotated frame ──────────────────────────────
+    if (data.annotated_frame) {
+      output.src = data.annotated_frame;
+    }
+
+    // ── Session counters ─────────────────────────────
+    framesSent++;
+    document.getElementById('gFrames').textContent = data.frame_count         ?? framesSent;
+    document.getElementById('gDrowsy').textContent = data.total_drowsy_events ?? 0;
+    document.getElementById('gYawn').textContent   = data.total_yawn_events   ?? 0;
+
+    // ── EAR / MAR live values ─────────────────────────
+    const ear = data.ear_avg ?? 0;
+    const mar = data.mar     ?? 0;
+    document.getElementById('earVal').textContent = ear.toFixed(3);
+    document.getElementById('marVal').textContent = mar.toFixed(3);
+    // Colour the EAR box: red if eye closed, normal otherwise
+    const earBox = document.getElementById('earBox');
+    earBox.className = 'ratio-box' + (ear < EAR_THRESH && data.face_detected ? ' bad' : '');
+    // Colour the MAR box: warn if yawning
+    const marBox = document.getElementById('marBox');
+    marBox.className = 'ratio-box' + (data.yawn_detected ? ' warn' : '');
+
+    // ── Detection status ──────────────────────────────
+    //
+    //  FIX: Always set a visible state regardless of boolean value.
+    //  setStatus(id, colorKind, subText)
+    //  colorKind: 'ok' | 'bad' | 'warn' | '' (neutral/no highlight)
+
+    // Eyes: open=ok, closed=bad, no face=neutral
+    if (!data.face_detected) {
+      setStatus('siEyes', '',    'NO FACE',   'siEyesSub');
+    } else if (data.eyes_detected) {
+      setStatus('siEyes', 'ok',  'OPEN',      'siEyesSub');
+    } else {
+      setStatus('siEyes', 'bad', 'CLOSED',    'siEyesSub');
+    }
+
+    // Face: detected=ok, missing=bad
+    setStatus('siFace',
+      data.face_detected ? 'ok' : 'bad',
+      data.face_detected ? 'DETECTED' : 'NOT FOUND',
+      'siFaceSub');
+
+    // Yawn: yawning=warn, normal=ok
+    setStatus('siYawn',
+      data.yawn_detected ? 'warn' : 'ok',
+      data.yawn_detected ? 'YAWNING' : 'NORMAL',
+      'siYawnSub');
+
+    // Drowsy alert: alert=bad, ok=ok
+    setStatus('siDrowsy',
+      data.drowsy_alert ? 'bad' : 'ok',
+      data.drowsy_alert ? '⚠ ALERT!'  : 'OK',
+      'siDrowsySub');
+
+    // ── Bar meters ────────────────────────────────────
+    const ec = data.eye_closed_counter ?? 0;
+    const yc = data.yawn_counter       ?? 0;
+
+    const eyePct  = Math.min(ec / EYE_MAX  * 100, 100);
+    const yawnPct = Math.min(yc / YAWN_MAX * 100, 100);
+
+    setMeter('mEye',  eyePct,  eyePct  > 80 ? 'danger' : eyePct  > 50 ? 'warn' : '');
+    setMeter('mYawn', yawnPct, yawnPct > 80 ? 'danger' : yawnPct > 50 ? 'warn' : '');
+    document.getElementById('mEyeVal').textContent  = ec + '/' + EYE_MAX;
+    document.getElementById('mYawnVal').textContent = yc + '/' + YAWN_MAX;
+
+    // ── Alert level ───────────────────────────────────
+    const newLevel = data.alert_level || 'NORMAL';
+    setAlertUI(newLevel);
+
+    if (newLevel === 'DANGER'  && prevAlertLevel !== 'DANGER') {
+      addLog('🚨 DROWSINESS DANGER triggered!', 'danger');
+      playAlarm('danger');
+    }
+    if (newLevel === 'WARNING' && prevAlertLevel === 'NORMAL') {
+      addLog('⚠ Fatigue warning detected.', 'warn');
+      playAlarm('warning');
+    }
+    if (newLevel === 'NORMAL'  && prevAlertLevel !== 'NORMAL' && prevAlertLevel !== 'IDLE') {
+      addLog('✅ Alert cleared — driver alert.', 'ok');
+    }
+    if (data.yawn_alert && prevAlertLevel !== 'WARNING' && prevAlertLevel !== 'DANGER') {
+      addLog('😮 Yawn event recorded.', 'warn');
+    }
+
+    prevAlertLevel = newLevel;
+
+  } catch (e) {
+    document.getElementById('fpsLabel').textContent = 'ERR';
+    // Throttle error spam: log on first error and then every 30 frames
+    if (framesSent === 0 || framesSent % 30 === 0)
+      addLog('Server error: ' + e.message, 'danger');
+  }
+
+  inFlight = false;
+}
+
+// ══════════════════════════════════════════════════════
+//  setStatus — always applies a class, even for "good" state
+//  kind: 'ok' | 'bad' | 'warn' | '' (neutral)
+// ══════════════════════════════════════════════════════
+function setStatus(itemId, kind, subText, subId) {
+  const el  = document.getElementById(itemId);
+  const sub = document.getElementById(subId);
+
+  // Remove all state classes first
+  el.classList.remove('active-ok', 'active-bad', 'active-warn');
+
+  if (kind === 'ok')   el.classList.add('active-ok');
+  if (kind === 'bad')  el.classList.add('active-bad');
+  if (kind === 'warn') el.classList.add('active-warn');
+
+  if (sub) sub.textContent = subText || '--';
+}
+
+// ══════════════════════════════════════════════════════
+//  setMeter
+// ══════════════════════════════════════════════════════
+function setMeter(id, pct, cls) {
+  const el = document.getElementById(id);
+  el.style.width = pct + '%';
+  el.className   = 'meter-fill ' + (cls || '');
+}
+
+// ══════════════════════════════════════════════════════
+//  setAlertUI — fully resets classes before applying new state
+// ══════════════════════════════════════════════════════
+function setAlertUI(level) {
+  const banner = document.getElementById('alertBanner');
+  const icon   = document.getElementById('alertIcon');
+  const text   = document.getElementById('alertText');
+  const badge  = document.getElementById('alertBadge');
+  const panel  = document.getElementById('cameraPanel');
+
+  // FIX: fully reset all state classes before adding the new one
+  banner.className = 'alert-banner';
+  panel.className  = 'camera-panel';  // base class only
+
+  switch (level) {
+    case 'DANGER':
+      banner.classList.add('danger');
+      panel.classList.add('alert-danger');
+      icon.textContent  = '🚨';
+      text.textContent  = 'DANGER — Driver appears drowsy! Eyes closed too long. Pull over safely.';
+      badge.textContent = 'DANGER';
+      break;
+    case 'WARNING':
+      banner.classList.add('warning');
+      panel.classList.add('alert-warning');
+      icon.textContent  = '⚠️';
+      text.textContent  = 'WARNING — Signs of fatigue detected. Yawning or reduced eye activity observed.';
+      badge.textContent = 'WARNING';
+      break;
+    case 'NORMAL':
+      panel.classList.add('alert-normal');
+      icon.textContent  = '✅';
+      text.textContent  = 'NORMAL — Driver appears alert. All metrics within safe range.';
+      badge.textContent = 'NORMAL';
+      break;
+    default: // IDLE
+      panel.classList.add('alert-normal');
+      icon.textContent  = '🟢';
+      text.textContent  = 'System ready. Start camera to begin monitoring.';
+      badge.textContent = 'IDLE';
+  }
+}
+
+// ══════════════════════════════════════════════════════
+//  addLog
+// ══════════════════════════════════════════════════════
+function addLog(msg, type) {
+  const box = document.getElementById('logBox');
+  const ts  = new Date().toLocaleTimeString('en-IN', { hour12: false });
+  const div = document.createElement('div');
+  div.className = 'log-entry log-' + (type || 'ok');
+  div.innerHTML = '<span class="log-time">' + ts + '</span>' + msg;
+  box.appendChild(div);
+  while (box.children.length > 100) box.removeChild(box.firstChild);
+  box.scrollTop = box.scrollHeight;
+}
+
+// ══════════════════════════════════════════════════════
+//  pingServer
+// ══════════════════════════════════════════════════════
+async function pingServer() {
+  const url = document.getElementById('serverUrl').value.replace(/\/$/, '');
+  const el  = document.getElementById('pingStatus');
+  el.textContent = 'Pinging…';
+  el.style.color = 'var(--muted)';
+  try {
+    const t0   = performance.now();
+    const r    = await fetch(url + '/health');
+    const ms   = (performance.now() - t0).toFixed(0);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const info = await r.json();
+    el.textContent = '✅ Connected — ' + ms + 'ms | engine: ' + (info.engine || 'ok') + ' | state: ' + info.alert_level;
+    el.style.color = 'var(--accent2)';
+    addLog('Server ping OK (' + ms + 'ms) — EAR thresh ' + info.ear_threshold + ' MAR thresh ' + info.mar_threshold, 'ok');
+  } catch (e) {
+    el.textContent = '❌ ' + e.message;
+    el.style.color = 'var(--danger)';
+    addLog('Ping failed: ' + e.message, 'danger');
+  }
+}
+
+// ══════════════════════════════════════════════════════
+//  resetSession
+// ══════════════════════════════════════════════════════
+async function resetSession() {
+  const url = document.getElementById('serverUrl').value.replace(/\/$/, '');
+  try {
+    const r = await fetch(url + '/reset', { method: 'POST' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+  } catch (e) {
+    addLog('Server reset failed: ' + e.message + ' (local counters reset)', 'warn');
+  }
+
+  framesSent     = 0;
+  fpsHistory     = [];
+  lastFrameTime  = 0;
+  prevAlertLevel = 'IDLE';
+
+  document.getElementById('gFrames').textContent  = '0';
+  document.getElementById('gDrowsy').textContent  = '0';
+  document.getElementById('gYawn').textContent    = '0';
+  document.getElementById('gFPS').textContent     = '0';
+  document.getElementById('fpsLabel').textContent = '-- FPS';
+  document.getElementById('earVal').textContent   = '—';
+  document.getElementById('marVal').textContent   = '—';
+  document.getElementById('earBox').className     = 'ratio-box';
+  document.getElementById('marBox').className     = 'ratio-box';
+
+  setMeter('mEye',  0, '');
+  setMeter('mYawn', 0, '');
+  document.getElementById('mEyeVal').textContent  = '0/' + EYE_MAX;
+  document.getElementById('mYawnVal').textContent = '0/' + YAWN_MAX;
+
+  // Reset all status items to neutral
+  ['siEyes','siFace','siYawn','siDrowsy'].forEach(id => {
+    const el = document.getElementById(id);
+    el.className = 'status-item';
+  });
+  document.getElementById('siEyesSub').textContent  = '--';
+  document.getElementById('siFaceSub').textContent  = '--';
+  document.getElementById('siYawnSub').textContent  = '--';
+  document.getElementById('siDrowsySub').textContent = '--';
+
+  setAlertUI(running ? 'NORMAL' : 'IDLE');
+  addLog('Session reset.', 'ok');
+}
+</script>
+</body>
+</html>
